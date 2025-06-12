@@ -33,7 +33,7 @@ public class MeteoService {
     public Map<String, Object> getMeteoActuelle(User user) {
         // ✅ Fixed: Add missing "=" in URL
         String url = "https://api.openweathermap.org/data/2.5/weather?lat=" + user.getLatitude()
-                + "&lon=" + user.getLongitude() + "&appid" + apiKey + "&units=metric";
+                + "&lon=" + user.getLongitude() + "&appid=" + apiKey + "&units=metric";
 
         System.out.println("🌍 URL envoyée à OpenWeather : " + url);
 
@@ -51,7 +51,7 @@ public class MeteoService {
     public Map<String, Object> getPrevision5Jours(User user) {
         // ✅ Fixed: Add missing "=" in URL
         String url = "https://api.openweathermap.org/data/2.5/forecast?lat=" + user.getLatitude()
-                + "&lon=" + user.getLongitude() + "&appid" + apiKey + "&units=metric";
+                + "&lon=" + user.getLongitude() + "&appid=" + apiKey + "&units=metric";
 
         Map<String, Object> response = (Map<String, Object>) restTemplate.getForObject(url, Object.class);
 

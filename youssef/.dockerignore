@@ -1,0 +1,16 @@
+# /youssef/.dockerignore
+
+# Ne pas copier le dossier des dépendances locales
+node_modules
+
+# Ne pas copier le dossier de build local
+build
+
+# Fichiers de log et de débogage
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Fichiers de configuration de l'IDE
+.vscode
+.idea

@@ -1,0 +1,36 @@
+version: '3.9'
+
+services:
+  backend:
+    build: .
+    container_name: spring-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/PFE
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=admin
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_SHOW_SQL=true
+      - SPRING_SECURITY_USER_NAME=admin
+      - SPRING_SECURITY_USER_PASSWORD=admin
+      - WEATHER_API_KEY=9930a3ba2b922f882d728896e0098ed6
+      - GROQ_API_KEY=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
+      - GROQ_MODEL=llama3-70b-8192
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15
+    container_name: postgres-db
+    environment:
+      POSTGRES_DB: PFE
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:

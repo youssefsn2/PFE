@@ -6,6 +6,7 @@ import com.backend.backend.model.User;
 import com.backend.backend.repository.AirQualityRepository;
 import com.backend.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value; // <-- IMPORTANT : Assurez-vous que cet import est présent
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,6 +21,10 @@ import java.util.Optional;
 
 @Service
 public class AirQualityService {
+
+    // --- AJOUT DE LA VARIABLE D'ENVIRONNEMENT ---
+    @Value("${mqtt.bridge.url}")
+    private String mqttBridgeUrl;
 
     private final RestTemplate restTemplate;
     private final AirQualityRepository airQualityRepository;
@@ -41,7 +46,10 @@ public class AirQualityService {
 
     @Transactional
     public Map<String, Object> getLiveAirQualityAndSave() {
-        String url = "http://localhost:5001/api/capteurs";
+        // --- MODIFICATION DE L'URL ---
+        // On utilise la variable injectée au lieu de "localhost"
+        String url = this.mqttBridgeUrl;
+
         try {
             ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
@@ -49,8 +57,8 @@ public class AirQualityService {
                 System.out.println("📱 Données live reçues de Flask : " + liveData);
 
                 Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-                if (authentication == null || !authentication.isAuthenticated()) {
-                    System.out.println("⚠ Aucun utilisateur authentifié, données non enregistrées.");
+                if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+                    System.out.println("⚠ Aucun utilisateur authentifié ou utilisateur anonyme, données non enregistrées.");
                     return liveData;
                 }
 
@@ -63,6 +71,12 @@ public class AirQualityService {
 
                 User user = userOpt.get();
                 Preferences prefs = user.getPreferences();
+
+                if (prefs == null) {
+                    System.out.println("⚠ L'utilisateur " + user.getEmail() + " n'a pas de préférences configurées. Impossible de vérifier les seuils.");
+                    // On pourrait vouloir enregistrer quand même les données, mais on ne peut pas notifier.
+                    // Pour l'instant, on continue, mais c'est un point à noter.
+                }
 
                 AirQuality data = new AirQuality();
                 data.setPm25(getDoubleValue(liveData.get("pm25")));
@@ -78,7 +92,7 @@ public class AirQualityService {
                 System.out.println("✅ Données enregistrées pour : " + user.getEmail());
 
                 // 🔔 Notifications selon préférences utilisateur
-                if (prefs.isNotificationsActives()) {
+                if (prefs != null && prefs.isNotificationsActives()) {
                     if (data.getAqi() > prefs.getSeuilAqi()) {
                         notificationService.sendPollutionAlert(user.getId(), data.getAqi());
                     }
@@ -102,12 +116,12 @@ public class AirQualityService {
                 return liveData;
 
             } else {
-                System.out.println("❌ Erreur lors de la récupération des données live !");
+                System.out.println("❌ Erreur lors de la récupération des données live ! Status: " + response.getStatusCode());
                 return null;
             }
 
         } catch (Exception e) {
-            System.out.println("❌ Erreur de connexion à Flask : " + e.getMessage());
+            System.out.println("❌ Erreur de connexion à l'URL du pont : " + url + ". Erreur: " + e.getMessage());
             return null;
         }
     }
@@ -121,11 +135,12 @@ public class AirQualityService {
     }
 
     private double getDoubleValue(Object value) {
+        if (value == null) return 0.0;
         return value instanceof Number ? ((Number) value).doubleValue() : Double.parseDouble(value.toString());
     }
 
     private int getIntegerValue(Object value) {
+        if (value == null) return 0;
         return value instanceof Number ? ((Number) value).intValue() : Integer.parseInt(value.toString());
     }
-
 }

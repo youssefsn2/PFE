@@ -1,0 +1,109 @@
+services:
+  # --- Backend Spring Boot ---
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    dns:
+      - 8.8.8.8 # Utilise le DNS de Google pour une meilleure résolution de noms externes
+    environment:
+      # L'URL de la BDD pointe vers le nom du service Docker 'db'
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/PFE
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=admin
+      # L'URL du pont MQTT pointe vers le nom du service 'mqtt-bridge'
+      - MQTT_BRIDGE_URL=http://mqtt-bridge:5001/api/capteurs
+      # Vos clés API, lues depuis le fichier .env
+      - WEATHER_API_KEY=${WEATHER_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+    depends_on:
+      db:
+        condition: service_healthy # Attend que la BDD soit prête
+      mqtt-bridge:
+        condition: service_started # Attend juste que le pont démarre
+    networks:
+      - app-net
+
+  # --- Frontend React + Nginx ---
+  frontend:
+    build:
+      context: ./youssef
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8 # Aide pour l'étape npm install dans le Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - app-net
+
+  # --- Base de Données PostgreSQL ---
+  db:
+    image: postgres:14-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=PFE
+    healthcheck:
+      # Commande pour vérifier si la BDD est prête à accepter les connexions
+      test: ["CMD-SHELL", "pg_isready -U postgres -d PFE"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-net
+
+  # --- Broker MQTT Mosquitto ---
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./pythone-mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    networks:
+      - app-net
+      
+  # --- Pont MQTT vers API (Python Flask) ---
+  mqtt-bridge:
+    build:
+      context: ./pythone-mqtt
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      - MQTT_BROKER=mosquitto
+    command: ["python", "-u", "mqtt_server.py"] # Le '-u' désactive le buffer de sortie pour voir les logs instantanément
+    depends_on:
+      - mosquitto
+    networks:
+      - app-net
+
+  # --- Simulateur de Capteur (Python Publisher) ---
+  sensor-publisher:
+    build:
+      context: ./pythone-mqtt
+    restart: unless-stopped
+    environment:
+      - MQTT_BROKER=mosquitto
+    command: ["python", "-u", "sensor_publisher.py"] # Le '-u' désactive le buffer de sortie
+    depends_on:
+      - mosquitto
+    networks:
+      - app-net
+
+# --- Volumes & Réseaux ---
+volumes:
+  postgres_data:
+
+networks:
+  app-net:
+    driver: bridge

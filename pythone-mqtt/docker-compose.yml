@@ -1,0 +1,42 @@
+services:
+  broker:
+    image: eclipse-mosquitto:2
+    container_name: mqtt_broker
+    ports:
+      - "1883:1883"
+    # --- MODIFIÉ : On ajoute notre fichier de configuration ---
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "healthcheck", "-C", "1"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  publisher:
+    build: .
+    container_name: sensor_publisher
+    depends_on:
+      broker:
+        condition: service_healthy
+    environment:
+      - MQTT_BROKER=broker
+    command: ["python", "sensor_publisher.py"]
+
+  api_server:
+    build: .
+    container_name: mqtt_api_server
+    depends_on:
+      broker:
+        condition: service_healthy
+    environment:
+      - MQTT_BROKER=broker
+    ports:
+      - "5001:5001"
+    command: ["python", "mqtt_server.py"]
+
+volumes:
+  mosquitto_data:
+  mosquitto_log:

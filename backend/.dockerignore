@@ -1,0 +1,19 @@
+# Dossier de build Maven
+/target
+
+# Fichiers de configuration de l'IDE
+.idea/
+*.iml
+.vscode/
+
+# Fichiers de log
+*.log
+
+# Fichiers spécifiques au système d'exploitation
+.DS_Store
+Thumbs.db
+
+# Fichiers de configuration Maven Wrapper
+.mvn/
+mvnw
+mvnw.cmd
