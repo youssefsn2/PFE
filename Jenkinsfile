@@ -1,8 +1,8 @@
 pipeline {
     agent {
-        dockerfile {
-            filename 'Dockerfile'  // Ton fichier Dockerfile est à la racine
-            dir 'jenkins'               // Ou spécifie le dossier si ce n’est pas à la racine
+        docker {
+            image 'serhaneyoussef/agent-docker'
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
         }
     }
 
@@ -17,14 +17,14 @@ pipeline {
         stage('Build & Deploy Application') {
             steps {
                 echo '2. Construction et déploiement de l application...'
-                sh 'docker-compose up --build -d'
+                sh 'docker compose up --build -d'
             }
         }
 
         stage('Health Check') {
             steps {
-                echo '3. Vérification des services...'
-                sh 'docker-compose ps'
+                echo '3. Vérification de l’état du conteneur...'
+                sh 'curl -f http://localhost:3000 || exit 1'
             }
         }
     }
@@ -32,12 +32,12 @@ pipeline {
     post {
         always {
             echo '4. Nettoyage...'
-            sh 'docker-compose down --remove-orphans || true'
+            sh 'docker compose down --remove-orphans || true'
         }
 
         failure {
             echo '❌ Pipeline Échoué. Affichage des logs...'
-            sh 'docker-compose logs --tail=200 || true'
+            sh 'docker compose logs --tail=200 || true'
         }
     }
 }
