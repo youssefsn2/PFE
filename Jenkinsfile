@@ -27,6 +27,12 @@ pipeline {
                 sh 'curl -f http://localhost:3000 || exit 1'
             }
         }
+stage('Debug Permissions') {
+    steps {
+        sh 'ls -la /var/jenkins_home'
+        sh 'whoami'
+    }
+}
     }
 
     post {
