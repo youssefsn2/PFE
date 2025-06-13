@@ -1,8 +1,8 @@
 pipeline {
-       agent {
+    agent {
         docker {
-            image 'serhaneyoussef/agent-docker'
-            args '-v //var/run/docker.sock:/var/run/docker.sock'
+            image 'jenkins-agent-docker' // ← ton image locale
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
         }
     }
 
