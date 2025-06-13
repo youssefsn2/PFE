@@ -2,7 +2,7 @@ pipeline {
     agent {
         dockerfile {
             filename 'Dockerfile'  // Ton fichier Dockerfile est à la racine
-            dir '.'               // Ou spécifie le dossier si ce n’est pas à la racine
+            dir 'jenkins'               // Ou spécifie le dossier si ce n’est pas à la racine
         }
     }
 
