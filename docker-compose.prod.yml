@@ -1,0 +1,74 @@
+# docker-compose.prod.yml
+version: '3.8'
+
+services:
+  # --- Registre Docker Privé (tourne sur le serveur) ---
+  registry:
+    image: registry:2
+    restart: unless-stopped
+    ports: ["5000:5000"]
+    volumes: [registry_data:/var/lib/registry]
+
+  # --- Backend ---
+  backend:
+    image: localhost:5000/pfe-backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${POSTGRES_DB}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - MQTT_BRIDGE_URL=http://mqtt-bridge:5001/api/capteurs
+      - WEATHER_API_KEY=${WEATHER_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+    depends_on: { db: { condition: service_healthy } }
+
+  # --- Frontend ---
+  frontend:
+    image: localhost:5000/pfe-frontend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      # On exposera un port différent pour Staging et Prod plus tard
+      - "${FRONTEND_PORT}:80"
+    depends_on: [backend]
+
+  # --- Python Bridge ---
+  mqtt-bridge:
+    image: localhost:5000/pfe-python-mqtt:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment: [MQTT_BROKER=mosquitto]
+    command: ["python", "-u", "mqtt_server.py"]
+    depends_on: [mosquitto]
+
+  # --- Python Publisher ---
+  sensor-publisher:
+    image: localhost:5000/pfe-python-mqtt:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment: [MQTT_BROKER=mosquitto]
+    command: ["python", "-u", "sensor_publisher.py"]
+    depends_on: [mosquitto]
+
+  # --- Services d'infrastructure ---
+  db:
+    image: postgres:14-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    restart: unless-stopped
+    ports: ["1883:1883"]
+    volumes: ["./mosquitto-config/mosquitto.conf:/mosquitto/config/mosquitto.conf"]
+
+volumes:
+  postgres_data:
+  registry_data:
